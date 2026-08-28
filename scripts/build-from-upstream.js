@@ -54,6 +54,22 @@ function resolveCodexVendor(platform) {
   if (!triple) return null;
   const binName = platform === "win" ? "codex.exe" : "codex";
 
+  // bitgate: prefer a codex binary built from our fork (profile model
+  // selector in app-server) over the @cometix vendor packages.
+  const envPath = process.env.CODEX_VENDOR_BIN;
+  if (envPath) {
+    if (!fs.existsSync(envPath)) {
+      throw new Error(`CODEX_VENDOR_BIN set but not found: ${envPath}`);
+    }
+    console.log(`   [codex] using CODEX_VENDOR_BIN: ${envPath}`);
+    return envPath;
+  }
+  const forkPath = path.join(PROJECT_ROOT, "vendor", "codex", triple, binName);
+  if (fs.existsSync(forkPath)) {
+    console.log(`   [codex] using fork binary: ${forkPath}`);
+    return forkPath;
+  }
+
   // Try platform-specific package (0.128+)
   const PKG_MAP = { "mac-arm64": "codex-darwin-arm64", "mac-x64": "codex-darwin-x64", "win": "codex-win32-x64" };
   const platPkg = PKG_MAP[platform];
@@ -295,9 +311,9 @@ function replaceCodex(platform, resourcesDir, binName) {
     const dest = path.join(resourcesDir, binName);
     fs.copyFileSync(vendor, dest);
     try { fs.chmodSync(dest, 0o755); } catch {}
-    console.log(`   [codex] replaced with @cometix/codex`);
+    console.log(`   [codex] replaced from ${vendor}`);
   } else {
-    console.log(`   [!] @cometix/codex not found, keeping upstream codex`);
+    console.log(`   [!] no codex vendor found, keeping upstream codex`);
   }
 }
 
